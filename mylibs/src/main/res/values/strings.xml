@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">mylibs</string>
+
+    <!-- ReflashListView -->
+    <string name="refresh_text_down_refresh">下拉刷新</string>
+    <string name="refresh_text_refreshing">正在刷新...</string>
+    <string name="refresh_text_release_fresh">释放刷新</string>
+    <string name="refresh_text_date_prompt">最后刷新时间:</string>
+    <!-- ReflashListView -->
+</resources>
