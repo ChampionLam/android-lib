@@ -14,12 +14,15 @@ import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.RelativeLayout;
+import android.widget.Toast;
 
 import com.tocet.championlam.mylibs.R;
 
 import org.xutils.image.ImageOptions;
 import org.xutils.x;
 
+import java.util.LinkedList;
+import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -35,6 +38,11 @@ public class ScrollImageContainer extends FrameLayout {
     private View mContentView;
     private RelativeLayout rlIdentification;
     private int currIndex;
+    private LinkedList<ImageView> mViews;
+    private boolean IsAutoLoop = false;
+    private int mInterval = 5000;
+    private loopHandler mlHandler;
+    private boolean mIsStartToRight = true;
     private ScheduledExecutorService scheduledExecutorService;
 
 
@@ -59,72 +67,65 @@ public class ScrollImageContainer extends FrameLayout {
         this.addView(mContentView);
     }
 
-    public void setImageData(String[] images, ImageOptions imageOptions, boolean IsLoop, boolean IsAutoLoop, int interval) {
+    public void setImageData(String[] images, ImageOptions imageOptions, boolean IsLoop) {
         this.mImageOptions = imageOptions != null ? imageOptions : this.mImageOptions;
-        vpContainer.setAdapter(new viewPagerAdapter(images, IsLoop));
-        initViewPager(images.length,IsLoop,IsAutoLoop,interval);
+        if (IsLoop) {
+            vpContainer.setAdapter(new loopAdapter(images));
+            vpContainer.setCurrentItem(1);
+        }else{
+            vpContainer.setAdapter(new viewPagerAdapter(images));
+            vpContainer.setCurrentItem(0);
+        }
+        initViewPager(images.length, IsLoop);
     }
 
-    private void initViewPager(int length, boolean isLoop, boolean isAutoLoop, int interval) {
+    public void setAutoLoop(int interval, boolean IsStartToRight) {
+        this.mInterval = interval;
+        mIsStartToRight = IsStartToRight;
+        mlHandler = new loopHandler();
+        mlHandler.startLoop();
+    }
 
-        if (isLoop)
-            vpContainer.setCurrentItem(Integer.MAX_VALUE / 2 / length * length);
-        if (isAutoLoop) {
-            scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
-            scheduledExecutorService.scheduleWithFixedDelay(new changeTask(), interval, interval, TimeUnit.SECONDS);
-        }
+    private void initViewPager(int length, final boolean isLoop) {
+
         vpContainer.setOnPageChangeListener(new ViewPager.OnPageChangeListener() {
             @Override
             public void onPageScrolled(int position, float positionOffset, int positionOffsetPixels) {
-                currIndex = position;
+                // do noting
             }
 
             @Override
             public void onPageSelected(int position) {
 
+                currIndex = position;
+                if (isLoop) {
+                    if (position == 0) {
+                        position = mViews.size() - 2;
+                    } else if (position == mViews.size() - 1) {
+                        position = 1;
+                    }
+                    vpContainer.setCurrentItem(position, false);
+                }
+
             }
 
             @Override
             public void onPageScrollStateChanged(int state) {
-
+                // do noting
             }
         });
-    }
-
-    private class changeTask implements Runnable {
-
-        @Override
-        public void run() {
-            currIndex = currIndex + 1;
-            handler.sendEmptyMessage(CHANGE_IMAGE);
-        }
-    }
-
-    public void setImageData(Bitmap[] images) {
-        for (int i = 0; i < images.length; i++) {
-            ImageView iv = new ImageView(this.mContext);
-            iv.setImageBitmap(images[i]);
-            iv.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        }
-        //vpContainer.setAdapter(new viewPagerAdapter());
     }
 
     class viewPagerAdapter extends PagerAdapter {
 
         private String[] mImages;
-        private boolean IsLoop = true;
 
-        public viewPagerAdapter(String[] images, boolean isLoop) {
+        public viewPagerAdapter(String[] images) {
             this.mImages = images;
-            this.IsLoop = isLoop;
         }
 
         @Override
         public int getCount() {
-            if (IsLoop) {
-                if (this.mImages.length > 1)
-                    return Integer.MAX_VALUE;
-            }
             return this.mImages.length;
         }
 
@@ -135,11 +136,8 @@ public class ScrollImageContainer extends FrameLayout {
 
         @Override
         public Object instantiateItem(ViewGroup container, final int position) {
-            int index = position;
-            if (IsLoop)
-                index = position % this.mImages.length;
             ImageView iv = new ImageView(mContext);
-            x.image().bind(iv, this.mImages[index], mImageOptions);
+            x.image().bind(iv, this.mImages[position], mImageOptions);
             container.addView(iv);
             return iv;
 
@@ -151,16 +149,89 @@ public class ScrollImageContainer extends FrameLayout {
         }
     }
 
-    private final static int CHANGE_IMAGE = 0X110;
-    private Handler handler = new Handler() {
-        @Override
-        public void handleMessage(Message msg) {
-            switch (msg.what) {
-                case CHANGE_IMAGE:
-                    vpContainer.setCurrentItem(currIndex);
-                    break;
+    public ViewPager getVierPager(){
+        return vpContainer;
+    }
+
+
+    class loopAdapter extends PagerAdapter {
+
+
+        public loopAdapter(String[] images) {
+            mViews = new LinkedList<ImageView>();
+            if (images != null && images.length > 1) {
+                //add first imageview
+                ImageView iv_head = new ImageView(mContext);
+                x.image().bind(iv_head, images[images.length - 1], mImageOptions);
+                mViews.add(iv_head);
+
+                //add mid
+                for (String url : images) {
+                    ImageView iv = new ImageView(mContext);
+                    x.image().bind(iv, url, mImageOptions);
+                    mViews.add(iv);
+                }
+
+                //add last imageview
+                ImageView iv_last = new ImageView(mContext);
+                x.image().bind(iv_last, images[0], mImageOptions);
+                mViews.add(iv_last);
+            } else if (images.length == 1) {
+                //if length = 1
+                ImageView iv = new ImageView(mContext);
+                x.image().bind(iv, images[0], mImageOptions);
+                mViews.add(iv);
             }
         }
-    };
+
+        @Override
+        public int getCount() {
+            return mViews.size();
+        }
+
+        @Override
+        public boolean isViewFromObject(View view, Object object) {
+            return view == object;
+        }
+
+        @Override
+        public Object instantiateItem(ViewGroup container, final int position) {
+            ImageView iv = mViews.get(position);
+            container.addView(iv);
+            return iv;
+
+        }
+
+        @Override
+        public void destroyItem(ViewGroup container, int position, Object object) {
+            container.removeView((View) object);
+        }
+    }
+
+    class loopHandler extends Handler {
+
+        public boolean pause = false;
+
+        @Override
+        public void handleMessage(Message msg) {
+            if (!pause) {
+                if(mIsStartToRight)
+                    vpContainer.setCurrentItem(currIndex + 1);
+                else
+                    vpContainer.setCurrentItem(currIndex - 1);
+            }
+            sendEmptyMessageDelayed(msg.what, mInterval);
+        }
+
+        void startLoop() {
+            pause = false;
+            removeCallbacksAndMessages(null);
+            sendEmptyMessageDelayed(1, mInterval);
+        }
+
+        void stopLoop() {
+            removeCallbacksAndMessages(null);
+        }
+    }
 
 }

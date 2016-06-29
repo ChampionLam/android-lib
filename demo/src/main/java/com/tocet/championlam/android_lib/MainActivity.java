@@ -51,7 +51,8 @@ public class MainActivity extends BaseActivity {
                 "http://g.hiphotos.baidu.com/image/pic/item/32fa828ba61ea8d3935d0305950a304e251f58b7.jpg"
         };
 
-        sicImages.setImageData(images, null, true, true, 5);
+        sicImages.setImageData(images, null, true);
+        sicImages.setAutoLoop(5000,false);
     }
 
     /**
